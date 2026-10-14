@@ -30,8 +30,9 @@ fi
 
 if [ ! -d "$WP_TESTS_DIR" ]; then
   mkdir -p "$WP_TESTS_DIR"
-  svn co --depth=immediates "https://develop.svn.wordpress.org/${WP_TESTS_REF}/tests/phpunit/includes/" "$WP_TESTS_DIR/includes"
-  svn co --depth=immediates "https://develop.svn.wordpress.org/${WP_TESTS_REF}/tests/phpunit/data/" "$WP_TESTS_DIR/data"
+  # PHPUnit compatibility files live in nested test-suite directories.
+  svn co "https://develop.svn.wordpress.org/${WP_TESTS_REF}/tests/phpunit/includes/" "$WP_TESTS_DIR/includes"
+  svn co "https://develop.svn.wordpress.org/${WP_TESTS_REF}/tests/phpunit/data/" "$WP_TESTS_DIR/data"
 fi
 
 if [ ! -f "$WP_TESTS_DIR/wp-tests-config.php" ]; then
