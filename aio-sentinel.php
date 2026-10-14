@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: AIO Sentinel
- * Plugin URI: https://aiowebdesigns.com/
+ * Plugin URI: https://github.com/aiowebdesignsbiz-Hub/aio-plugin-sentinel
  * Description: Detects known malicious-plugin indicators, blocks unsafe plugin activation, and provides a controlled quarantine workflow.
  * Version: 5.3.1
  * Author: AIO Web Designs
