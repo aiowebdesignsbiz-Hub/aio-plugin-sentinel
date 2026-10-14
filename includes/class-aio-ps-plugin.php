@@ -261,19 +261,25 @@ class AIO_PS_Plugin {
 	}
 
 	public function handle_settings() {
-		$this->require_admin_nonce( 'aio_ps_settings' );
+		if ( ! current_user_can( 'activate_plugins' ) ) {
+			wp_die( esc_html__( 'You are not allowed to manage plugins.', 'aio-plugin-sentinel' ) );
+		}
+		check_admin_referer( 'aio_ps_settings' );
 		$intervals = array( 'aio_ps_15_minutes', 'hourly', 'twicedaily', 'daily' );
 		$interval = isset( $_POST['scan_interval'] ) ? sanitize_key( wp_unslash( $_POST['scan_interval'] ) ) : 'hourly';
+		$notification_recipients = isset( $_POST['notification_recipients'] ) ? sanitize_textarea_field( wp_unslash( $_POST['notification_recipients'] ) ) : '';
+		$approved_admins = isset( $_POST['approved_admins'] ) ? sanitize_textarea_field( wp_unslash( $_POST['approved_admins'] ) ) : '';
+		$monitor_urls = isset( $_POST['monitor_urls'] ) ? sanitize_textarea_field( wp_unslash( $_POST['monitor_urls'] ) ) : '';
 		$settings = array(
 			'change_lock' => ! empty( $_POST['change_lock'] ),
 			'scan_interval' => in_array( $interval, $intervals, true ) ? $interval : 'hourly',
-			'notification_recipients' => $this->sanitize_recipients( isset( $_POST['notification_recipients'] ) ? wp_unslash( $_POST['notification_recipients'] ) : '' ),
+			'notification_recipients' => $this->sanitize_recipients( $notification_recipients ),
 			'auto_quarantine_known' => ! empty( $_POST['auto_quarantine_known'] ),
-			'approved_admins' => $this->sanitize_approved_admins( isset( $_POST['approved_admins'] ) ? wp_unslash( $_POST['approved_admins'] ) : '' ),
+			'approved_admins' => $this->sanitize_approved_admins( $approved_admins ),
 			'cleanup_unapproved_admins' => ! empty( $_POST['cleanup_unapproved_admins'] ),
 			'enforce_plugin_approval' => ! empty( $_POST['enforce_plugin_approval'] ),
 			'external_monitor' => ! empty( $_POST['external_monitor'] ),
-			'monitor_urls' => AIO_PS_Monitor::sanitize_monitor_urls( isset( $_POST['monitor_urls'] ) ? wp_unslash( $_POST['monitor_urls'] ) : '' ),
+			'monitor_urls' => AIO_PS_Monitor::sanitize_monitor_urls( $monitor_urls ),
 			'delete_data_on_uninstall' => ! empty( $_POST['delete_data_on_uninstall'] ),
 		);
 		update_option( self::OPTION_SETTINGS, $settings, false );
@@ -327,7 +333,10 @@ class AIO_PS_Plugin {
 	}
 
 	public function handle_approve_inventory() {
-		$this->require_admin_nonce( 'aio_ps_approve_inventory' );
+		if ( ! current_user_can( 'activate_plugins' ) ) {
+			wp_die( esc_html__( 'You are not allowed to manage plugins.', 'aio-plugin-sentinel' ) );
+		}
+		check_admin_referer( 'aio_ps_approve_inventory' );
 		if ( empty( $_POST['aio_ps_acknowledge_inventory'] ) ) {
 			$this->redirect( array( 'aio_ps_error' => rawurlencode( __( 'Confirm that you reviewed the full plugin directories before approving the inventory.', 'aio-plugin-sentinel' ) ) ) );
 		}
@@ -363,7 +372,10 @@ class AIO_PS_Plugin {
 	}
 
 	public function handle_restore_quarantine() {
-		$this->require_admin_nonce( 'aio_ps_restore_quarantine' );
+		if ( ! current_user_can( 'activate_plugins' ) ) {
+			wp_die( esc_html__( 'You are not allowed to manage plugins.', 'aio-plugin-sentinel' ) );
+		}
+		check_admin_referer( 'aio_ps_restore_quarantine' );
 		if ( ! current_user_can( 'delete_plugins' ) ) {
 			wp_die( esc_html__( 'You are not allowed to restore quarantined code.', 'aio-plugin-sentinel' ) );
 		}
@@ -628,11 +640,14 @@ class AIO_PS_Plugin {
 	}
 
 	private function render_notices() {
-		if ( isset( $_GET['aio_ps_notice'] ) ) {
+		// These query values only render a post-redirect notice; they do not perform an action.
+		$notice = isset( $_GET['aio_ps_notice'] ) ? sanitize_key( wp_unslash( $_GET['aio_ps_notice'] ) ) : '';
+		$error = isset( $_GET['aio_ps_error'] ) ? sanitize_text_field( wp_unslash( $_GET['aio_ps_error'] ) ) : '';
+		if ( $notice ) {
 			$messages = array( 'scanned' => __( 'Security scan completed.', 'aio-plugin-sentinel' ), 'baseline' => __( 'Clean baseline saved.', 'aio-plugin-sentinel' ), 'settings' => __( 'Monitoring settings saved.', 'aio-plugin-sentinel' ), 'test_email_sent' => __( 'Branded test email sent to the site administrator and configured security recipients.', 'aio-plugin-sentinel' ), 'cleaned' => __( 'Incident cleanup completed. Review the cleanup log below.', 'aio-plugin-sentinel' ), 'nothing_to_clean' => __( 'No critical finding or unapproved approved-list administrator required cleanup.', 'aio-plugin-sentinel' ), 'inventory_approved' => __( 'The current plugin inventory was recorded as approved.', 'aio-plugin-sentinel' ), 'restored' => __( 'The quarantined item was restored but was not activated.', 'aio-plugin-sentinel' ) );
-			echo '<div class="notice notice-success"><p>' . esc_html( isset( $messages[ $_GET['aio_ps_notice'] ] ) ? $messages[ $_GET['aio_ps_notice'] ] : __( 'Action completed.', 'aio-plugin-sentinel' ) ) . '</p></div>';
+			echo '<div class="notice notice-success"><p>' . esc_html( isset( $messages[ $notice ] ) ? $messages[ $notice ] : __( 'Action completed.', 'aio-plugin-sentinel' ) ) . '</p></div>';
 		}
-		if ( isset( $_GET['aio_ps_error'] ) ) { echo '<div class="notice notice-error"><p>' . esc_html( rawurldecode( wp_unslash( $_GET['aio_ps_error'] ) ) ) . '</p></div>'; }
+		if ( $error ) { echo '<div class="notice notice-error"><p>' . esc_html( rawurldecode( $error ) ) . '</p></div>'; }
 		if ( $blocked = get_transient( 'aio_ps_activation_blocked' ) ) { echo '<div class="notice notice-error"><p>' . esc_html__( 'Blocked plugin activation: ', 'aio-plugin-sentinel' ) . esc_html( $blocked ) . '</p></div>'; }
 	}
 
@@ -691,7 +706,7 @@ class AIO_PS_Plugin {
 		if ( empty( $exposure['core_update_available'] ) && ! $plugin_count ) {
 			echo '<p><strong>' . esc_html__( 'WordPress currently reports no core or plugin updates.', 'aio-plugin-sentinel' ) . '</strong></p>';
 		} else {
-			echo '<p>' . sprintf( esc_html__( 'WordPress reports %1$d core update(s) and %2$d plugin update(s). Review releases before approving and installing them.', 'aio-plugin-sentinel' ), ! empty( $exposure['core_update_available'] ) ? 1 : 0, $plugin_count ) . '</p>';
+			echo '<p>' . sprintf( esc_html__( 'WordPress reports %1$d core update(s) and %2$d plugin update(s). Review releases before approving and installing them.', 'aio-plugin-sentinel' ), ! empty( $exposure['core_update_available'] ) ? 1 : 0, absint( $plugin_count ) ) . '</p>';
 			if ( $plugin_count ) {
 				echo '<ul>';
 				foreach ( $exposure['plugin_updates'] as $plugin_file ) { echo '<li><code>' . esc_html( $plugin_file ) . '</code></li>'; }
@@ -709,7 +724,7 @@ class AIO_PS_Plugin {
 		echo '<h2>' . esc_html__( 'Quarantine Recovery', 'aio-plugin-sentinel' ) . '</h2><p>' . esc_html__( 'A restore only moves the selected item back to its original location. It does not activate a restored plugin. Restore only after a qualified review confirms the finding was a false positive.', 'aio-plugin-sentinel' ) . '</p>';
 		echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'Quarantined (UTC)', 'aio-plugin-sentinel' ) . '</th><th>' . esc_html__( 'Original location', 'aio-plugin-sentinel' ) . '</th><th>' . esc_html__( 'Action', 'aio-plugin-sentinel' ) . '</th></tr></thead><tbody>';
 		foreach ( $entries as $entry ) {
-			echo '<tr><td>' . esc_html( $entry['time'] ) . '</td><td><code>' . esc_html( $entry['source_path'] ) . '</code></td><td><form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '"><input type="hidden" name="action" value="aio_ps_restore_quarantine" /><input type="hidden" name="aio_ps_quarantine_token" value="' . esc_attr( $entry['token'] ) . '" />' . wp_nonce_field( 'aio_ps_restore_quarantine', '_wpnonce', true, false ) . '<input type="submit" class="button" value="' . esc_attr__( 'Restore Without Activating', 'aio-plugin-sentinel' ) . '" onclick="return confirm(\'This will return the quarantined code to its original location without activating it. Continue only if the finding has been reviewed as a false positive.\');" /></form></td></tr>';
+			echo '<tr><td>' . esc_html( $entry['time'] ) . '</td><td><code>' . esc_html( $entry['source_path'] ) . '</code></td><td><form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '"><input type="hidden" name="action" value="aio_ps_restore_quarantine" /><input type="hidden" name="aio_ps_quarantine_token" value="' . esc_attr( $entry['token'] ) . '" />' . wp_kses_post( wp_nonce_field( 'aio_ps_restore_quarantine', '_wpnonce', true, false ) ) . '<input type="submit" class="button" value="' . esc_attr__( 'Restore Without Activating', 'aio-plugin-sentinel' ) . '" onclick="return confirm(\'This will return the quarantined code to its original location without activating it. Continue only if the finding has been reviewed as a false positive.\');" /></form></td></tr>';
 		}
 		echo '</tbody></table>';
 	}
