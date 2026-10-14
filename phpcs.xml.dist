@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<ruleset name="AIO Plugin Sentinel">
+  <description>WordPress coding standards for AIO Plugin Sentinel.</description>
+  <file>aio-plugin-sentinel.php</file>
+  <file>includes</file>
+  <file>mu-plugin</file>
+  <file>uninstall.php</file>
+  <exclude-pattern>vendor/*</exclude-pattern>
+  <rule ref="WordPress">
+    <exclude name="WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound" />
+  </rule>
+</ruleset>

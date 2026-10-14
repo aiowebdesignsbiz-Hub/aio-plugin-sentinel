@@ -1,0 +1,6 @@
+/vendor/
+/node_modules/
+/.phpunit.cache/
+/coverage/
+/.DS_Store
+Thumbs.db

@@ -1,0 +1,15 @@
+{
+  "name": "aiowebdesigns/aio-plugin-sentinel",
+  "description": "A WordPress security monitoring and controlled-response plugin.",
+  "type": "wordpress-plugin",
+  "license": "GPL-2.0-or-later",
+  "require-dev": {
+    "phpunit/phpunit": "^9.6",
+    "wp-coding-standards/wpcs": "^3.1",
+    "dealerdirect/phpcodesniffer-composer-installer": "^1.0"
+  },
+  "scripts": {
+    "test": "phpunit",
+    "lint": "phpcs --standard=phpcs.xml.dist"
+  }
+}
