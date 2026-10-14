@@ -4,7 +4,7 @@ Tags: security, malware, plugin, x-dav
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 5.2.0
+Stable tag: 5.2.1
 License: GPL-2.0-or-later
 
 Detects known malicious plugin indicators associated with the x-dav/fake Cloudflare verification incident, blocks activation of confirmed malicious directory names, and offers a controlled quarantine workflow.
@@ -64,6 +64,10 @@ After the initial clean scan, create a baseline from Tools > Plugin Sentinel. Re
 The plugin automatically installs `mu-plugin/aio-plugin-sentinel-guard.php` to `wp-content/mu-plugins/aio-plugin-sentinel-guard.php` during activation and verifies it after updates. Tools > Plugin Sentinel also provides Install or Repair and Download buttons. If your host prevents WordPress from writing to the MU plugins folder, download the guard there and upload it to that exact location. This companion has no settings page and intentionally starts before ordinary plugins.
 
 == Changelog ==
+
+= 5.2.1 =
+* Hardened administrative security-action request handling and added an automated compatibility test matrix for supported WordPress and PHP versions.
+* Improved the release test workflow used to validate clean installs, settings retention, and update behavior.
 
 = 5.2.0 =
 * Added WordPress Privacy Policy guide content that explains local data storage, the opt-in same-site page check, notification emails, retention, and deletion choices.
