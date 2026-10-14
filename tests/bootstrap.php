@@ -10,7 +10,7 @@ if ( ! $_tests_dir ) {
 require_once $_tests_dir . '/includes/functions.php';
 
 tests_add_filter( 'muplugins_loaded', function() {
-	require dirname( __DIR__ ) . '/aio-plugin-sentinel.php';
+	require dirname( __DIR__ ) . '/aio-sentinel.php';
 } );
 
 require $_tests_dir . '/includes/bootstrap.php';

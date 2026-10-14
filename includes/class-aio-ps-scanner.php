@@ -63,7 +63,7 @@ class AIO_PS_Scanner {
 		$results = $this->scan();
 		foreach ( $results['findings'] as $finding ) {
 			if ( 'critical' === $finding['severity'] ) {
-				return new WP_Error( 'aio_ps_critical_findings', __( 'Baseline was not created because critical findings need review first.', 'aio-plugin-sentinel' ) );
+				return new WP_Error( 'aio_ps_critical_findings', __( 'Baseline was not created because critical findings need review first.', 'aio-sentinel' ) );
 			}
 		}
 		$manifest = array();
@@ -235,16 +235,18 @@ class AIO_PS_Scanner {
 			}
 		}
 		if ( ! file_exists( $source ) || ! $this->is_allowed_source( $source, $finding['location'] ) ) {
-			return new WP_Error( 'aio_ps_invalid_source', __( 'The finding is no longer in a permitted active location.', 'aio-plugin-sentinel' ) );
+			return new WP_Error( 'aio_ps_invalid_source', __( 'The finding is no longer in a permitted active location.', 'aio-sentinel' ) );
 		}
-		$quarantine = WP_CONTENT_DIR . '/aio-plugin-sentinel-quarantine';
-		if ( ! wp_mkdir_p( $quarantine ) ) {
-			return new WP_Error( 'aio_ps_quarantine_unavailable', __( 'Could not create the quarantine directory.', 'aio-plugin-sentinel' ) );
+		$filesystem = $this->filesystem();
+		$quarantine = $this->quarantine_directory();
+		if ( ! $filesystem || ( ! $filesystem->is_dir( $quarantine ) && ! $filesystem->mkdir( $quarantine, FS_CHMOD_DIR ) ) ) {
+			return new WP_Error( 'aio_ps_quarantine_unavailable', __( 'Could not create the quarantine directory.', 'aio-sentinel' ) );
 		}
 		$this->protect_quarantine( $quarantine );
 		$destination = $quarantine . '/' . gmdate( 'Ymd-His' ) . '-' . sanitize_file_name( basename( $source ) );
-		if ( ! @rename( $source, $destination ) ) {
-			return new WP_Error( 'aio_ps_quarantine_failed', __( 'Could not move the finding to quarantine. Check file permissions.', 'aio-plugin-sentinel' ) );
+		// phpcs:ignore PluginCheck.CodeAnalysis.WriteFile.PluginDirectoryWrite -- Critical findings are moved from an active location into uploads-based quarantine for safe review.
+		if ( ! $filesystem->move( $source, $destination, false ) ) {
+			return new WP_Error( 'aio_ps_quarantine_failed', __( 'Could not move the finding to quarantine. Check file permissions.', 'aio-sentinel' ) );
 		}
 		if ( 'plugin' === $finding['location'] ) {
 			$this->deactivate_plugin_owner( $finding['owner'] );
@@ -258,21 +260,28 @@ class AIO_PS_Scanner {
 	 * are intentionally not offered for restoration.
 	 */
 	public function quarantine_entries() {
-		$log = WP_CONTENT_DIR . '/aio-plugin-sentinel-quarantine/manifest.log';
-		if ( ! is_readable( $log ) ) {
+		$filesystem = $this->filesystem();
+		if ( ! $filesystem ) {
 			return array();
 		}
 		$entries = array();
-		$lines = @file( $log, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES );
-		if ( ! is_array( $lines ) ) {
-			return array();
-		}
-		$lines = array_reverse( array_filter( $lines ) );
-		foreach ( array_slice( $lines, 0, 50 ) as $line ) {
-			$entry = json_decode( $line, true );
-			if ( is_array( $entry ) && ! empty( $entry['source_path'] ) && ! empty( $entry['destination'] ) ) {
-				$entry['token'] = hash( 'sha256', $entry['source_path'] . '|' . $entry['destination'] );
-				$entries[] = $entry;
+		foreach ( $this->quarantine_directories() as $directory ) {
+			$log = trailingslashit( $directory ) . 'manifest.log';
+			if ( ! $filesystem->exists( $log ) ) {
+				continue;
+			}
+			$contents = $filesystem->get_contents( $log );
+			if ( false === $contents ) {
+				continue;
+			}
+			$lines = array_reverse( array_filter( preg_split( '/\r\n|\r|\n/', $contents ) ) );
+			foreach ( array_slice( $lines, 0, 50 ) as $line ) {
+				$entry = json_decode( $line, true );
+				if ( is_array( $entry ) && ! empty( $entry['source_path'] ) && ( ! empty( $entry['destination'] ) || ! empty( $entry['destination_path'] ) ) ) {
+					$entry['quarantine_root'] = $directory;
+					$entry['token'] = hash( 'sha256', $entry['source_path'] . '|' . ( isset( $entry['destination_path'] ) ? $entry['destination_path'] : $entry['destination'] ) );
+					$entries[] = $entry;
+				}
 			}
 		}
 		return $entries;
@@ -286,24 +295,25 @@ class AIO_PS_Scanner {
 		foreach ( $this->quarantine_entries() as $entry ) {
 			if ( hash_equals( $entry['token'], (string) $token ) ) {
 				$source = ABSPATH . ltrim( $entry['source_path'], '/\\' );
-				$destination = ABSPATH . ltrim( $entry['destination'], '/\\' );
-				$quarantine = WP_CONTENT_DIR . '/aio-plugin-sentinel-quarantine';
+				$destination = ! empty( $entry['destination_path'] ) ? $entry['destination_path'] : ABSPATH . ltrim( $entry['destination'], '/\\' );
+				$filesystem = $this->filesystem();
 				if ( ! file_exists( $destination ) ) {
-					return new WP_Error( 'aio_ps_restore_missing', __( 'The quarantined item is no longer available.', 'aio-plugin-sentinel' ) );
+					return new WP_Error( 'aio_ps_restore_missing', __( 'The quarantined item is no longer available.', 'aio-sentinel' ) );
 				}
-				if ( ! $this->is_safe_restore_path( $source ) || ! $this->is_path_in_root( $destination, $quarantine ) ) {
-					return new WP_Error( 'aio_ps_restore_invalid', __( 'The requested restore item is outside the permitted quarantine paths.', 'aio-plugin-sentinel' ) );
+				if ( ! $filesystem || ! $this->is_safe_restore_path( $source ) || ! $this->is_path_in_quarantine( $destination ) ) {
+					return new WP_Error( 'aio_ps_restore_invalid', __( 'The requested restore item is outside the permitted quarantine paths.', 'aio-sentinel' ) );
 				}
 				if ( file_exists( $source ) ) {
-					return new WP_Error( 'aio_ps_restore_exists', __( 'The original location is already occupied, so nothing was restored.', 'aio-plugin-sentinel' ) );
+					return new WP_Error( 'aio_ps_restore_exists', __( 'The original location is already occupied, so nothing was restored.', 'aio-sentinel' ) );
 				}
-				if ( ! wp_mkdir_p( dirname( $source ) ) || ! @rename( $destination, $source ) ) {
-					return new WP_Error( 'aio_ps_restore_failed', __( 'WordPress could not restore the quarantined item. Check hosting file permissions.', 'aio-plugin-sentinel' ) );
+				// phpcs:ignore PluginCheck.CodeAnalysis.WriteFile.PluginDirectoryWrite -- Restore is an explicit administrator action after false-positive review.
+				if ( ! wp_mkdir_p( dirname( $source ) ) || ! $filesystem->move( $destination, $source, false ) ) {
+					return new WP_Error( 'aio_ps_restore_failed', __( 'WordPress could not restore the quarantined item. Check hosting file permissions.', 'aio-sentinel' ) );
 				}
 				return true;
 			}
 		}
-		return new WP_Error( 'aio_ps_restore_unknown', __( 'The requested quarantine record could not be found.', 'aio-plugin-sentinel' ) );
+		return new WP_Error( 'aio_ps_restore_unknown', __( 'The requested quarantine record could not be found.', 'aio-sentinel' ) );
 	}
 
 	private function is_allowed_source( $source, $location ) {
@@ -393,19 +403,63 @@ class AIO_PS_Scanner {
 	}
 
 	private function protect_quarantine( $directory ) {
-		if ( ! file_exists( $directory . '/index.php' ) ) {
-			@file_put_contents( $directory . '/index.php', "<?php // Silence is golden.\n" );
+		$filesystem = $this->filesystem();
+		if ( ! $filesystem ) {
+			return;
 		}
-		if ( ! file_exists( $directory . '/.htaccess' ) ) {
-			@file_put_contents( $directory . '/.htaccess', "Require all denied\nDeny from all\n" );
-		}
-		if ( ! file_exists( $directory . '/web.config' ) ) {
-			@file_put_contents( $directory . '/web.config', '<?xml version="1.0"?><configuration><system.webServer><authorization><deny users="*" /></authorization></system.webServer></configuration>' );
+		$files = array(
+			'index.php'  => "<?php // Silence is golden.\n",
+			'.htaccess'  => "Require all denied\nDeny from all\n",
+			'web.config' => '<?xml version="1.0"?><configuration><system.webServer><authorization><deny users="*" /></authorization></system.webServer></configuration>',
+		);
+		foreach ( $files as $name => $contents ) {
+			$file = trailingslashit( $directory ) . $name;
+			if ( ! $filesystem->exists( $file ) ) {
+				$filesystem->put_contents( $file, $contents, FS_CHMOD_FILE );
+			}
 		}
 	}
 
 	private function write_quarantine_log( $finding, $source, $destination ) {
-		$entry = array( 'time' => current_time( 'mysql', true ), 'source' => $finding['file'], 'source_path' => wp_normalize_path( str_replace( ABSPATH, '', $source ) ), 'destination' => wp_normalize_path( str_replace( ABSPATH, '', $destination ) ) );
-		@file_put_contents( WP_CONTENT_DIR . '/aio-plugin-sentinel-quarantine/manifest.log', wp_json_encode( $entry ) . "\n", FILE_APPEND | LOCK_EX );
+		$filesystem = $this->filesystem();
+		if ( ! $filesystem ) {
+			return;
+		}
+		$entry = array( 'time' => current_time( 'mysql', true ), 'source' => $finding['file'], 'source_path' => wp_normalize_path( str_replace( ABSPATH, '', $source ) ), 'destination_path' => wp_normalize_path( $destination ) );
+		$log = trailingslashit( $this->quarantine_directory() ) . 'manifest.log';
+		$existing = $filesystem->exists( $log ) ? $filesystem->get_contents( $log ) : '';
+		$filesystem->put_contents( $log, $existing . wp_json_encode( $entry ) . "\n", FS_CHMOD_FILE );
+	}
+
+	private function quarantine_directory() {
+		$uploads = wp_get_upload_dir();
+		return trailingslashit( $uploads['basedir'] ) . 'aio-sentinel-quarantine';
+	}
+
+	private function quarantine_directories() {
+		$directories = array( $this->quarantine_directory() );
+		$legacy = WP_CONTENT_DIR . '/aio-plugin-sentinel-quarantine';
+		if ( $legacy !== $directories[0] ) {
+			$directories[] = $legacy;
+		}
+		return $directories;
+	}
+
+	private function is_path_in_quarantine( $path ) {
+		foreach ( $this->quarantine_directories() as $directory ) {
+			if ( $this->is_path_in_root( $path, $directory ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private function filesystem() {
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		global $wp_filesystem;
+		if ( ! $wp_filesystem && ! WP_Filesystem() ) {
+			return false;
+		}
+		return $wp_filesystem;
 	}
 }

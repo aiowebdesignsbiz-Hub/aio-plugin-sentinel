@@ -1,6 +1,6 @@
-# AIO Plugin Sentinel
+# AIO Sentinel
 
-AIO Plugin Sentinel helps WordPress administrators monitor for known x-dav and fake-verification indicators, unexpected executable-file changes, and unapproved plugin changes. It provides controlled quarantine, evidence export, an optional early-boot MU guard, and scheduled monitoring.
+AIO Sentinel helps WordPress administrators monitor for known x-dav and fake-verification indicators, unexpected executable-file changes, and unapproved plugin changes. It provides controlled quarantine, evidence export, an optional early-boot MU guard, and scheduled monitoring.
 
 ## What it protects
 

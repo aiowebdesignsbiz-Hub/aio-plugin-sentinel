@@ -1,13 +1,13 @@
-=== AIO Plugin Sentinel ===
+=== AIO Sentinel ===
 Contributors: aiowebdesigns
-Tags: security, malware, plugin, x-dav
+Tags: security, malware, x-dav, integrity
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 5.2.1
+Stable tag: 5.3.1
 License: GPL-2.0-or-later
 
-Detects known malicious plugin indicators associated with the x-dav/fake Cloudflare verification incident, blocks activation of confirmed malicious directory names, and offers a controlled quarantine workflow.
+Detects x-dav and fake-verification indicators, blocks malicious extensions, and provides controlled quarantine and integrity monitoring.
 
 == What it does ==
 
@@ -37,33 +37,42 @@ Review-level findings are not automatically quarantined. Export the evidence rep
 
 == Privacy and retention ==
 
-Plugin Sentinel keeps scan results, integrity hashes, approval records, configured notification recipients, and audit data in the local WordPress database. It does not send that data to AIO Web Designs. Public-page monitoring is optional and only requests this site's own URLs.
+AIO Sentinel keeps scan results, integrity hashes, approval records, configured notification recipients, and audit data in the local WordPress database. It does not send that data to AIO Web Designs. Public-page monitoring is optional and only requests this site's own URLs.
 
-Records are retained on uninstall by default. An administrator may opt in to delete Plugin Sentinel database records on uninstall from Tools > Plugin Sentinel. The quarantine directory and MU guard are intentionally never removed automatically so they remain available for review.
+Records are retained on uninstall by default. An administrator may opt in to delete AIO Sentinel database records on uninstall from Tools > AIO Sentinel. The quarantine directory and MU guard are intentionally never removed automatically so they remain available for review.
 
-Plugin Sentinel has no telemetry or remote code delivery. Its only optional network request is public-page monitoring, which is off by default and checks this site's own URLs. Notification emails use the site's configured WordPress mail service only after an administrator configures or accepts the site administrator recipient.
+AIO Sentinel has no telemetry or remote code delivery. Its only optional network request is public-page monitoring, which is off by default and checks this site's own URLs. Notification emails use the site's configured WordPress mail service only after an administrator configures or accepts the site administrator recipient.
 
 The plugin also adds this disclosure to WordPress's built-in Privacy Policy guide under Settings > Privacy, so site owners can include accurate local data-handling information in their policy.
 
 == Installation ==
 
-1. Zip the `aio-plugin-sentinel` directory.
+1. Zip the `aio-sentinel` directory.
 2. In WordPress, go to Plugins > Add New > Upload Plugin.
 3. Upload the ZIP and activate it.
-4. Go to Tools > Plugin Sentinel and run the first scan.
+4. Go to Tools > AIO Sentinel and run the first scan.
 5. Configure the scan interval, notification recipients, and any approved administrator accounts.
 
 == Updates and settings ==
 
-Plugin Sentinel updates are non-destructive. Replacing an older version with a newer AIO Plugin Sentinel ZIP keeps the website's existing settings, scan schedule, notification recipients, approved administrator list, integrity baseline, latest scan results, and cleanup audit log. New releases only add defaults for settings that did not exist in earlier versions.
+AIO Sentinel updates are non-destructive. Replacing an older version with a newer AIO Sentinel ZIP keeps the website's existing settings, scan schedule, notification recipients, approved administrator list, integrity baseline, latest scan results, and cleanup audit log. New releases only add defaults for settings that did not exist in earlier versions.
 
 == Hardening ==
 
-After the initial clean scan, create a baseline from Tools > Plugin Sentinel. Review and refresh it only after approved plugin changes. For a stronger operational control, test and then add `define( 'DISALLOW_FILE_MODS', true );` to wp-config.php; this disables dashboard plugin and theme installs, updates, and edits.
+After the initial clean scan, create a baseline from Tools > AIO Sentinel. Review and refresh it only after approved plugin changes. For a stronger operational control, test and then add `define( 'DISALLOW_FILE_MODS', true );` to wp-config.php; this disables dashboard plugin and theme installs, updates, and edits.
 
-The plugin automatically installs `mu-plugin/aio-plugin-sentinel-guard.php` to `wp-content/mu-plugins/aio-plugin-sentinel-guard.php` during activation and verifies it after updates. Tools > Plugin Sentinel also provides Install or Repair and Download buttons. If your host prevents WordPress from writing to the MU plugins folder, download the guard there and upload it to that exact location. This companion has no settings page and intentionally starts before ordinary plugins.
+The plugin automatically installs `mu-plugin/aio-plugin-sentinel-guard.php` to `wp-content/mu-plugins/aio-plugin-sentinel-guard.php` during activation and verifies it after updates. Tools > AIO Sentinel also provides Install or Repair and Download buttons. If your host prevents WordPress from writing to the MU plugins folder, download the guard there and upload it to that exact location. This companion has no settings page and intentionally starts before ordinary plugins.
 
 == Changelog ==
+
+= 5.3.1 =
+* Shortened the repository summary to meet the WordPress.org readme limit.
+
+= 5.3.0 =
+* Renamed the public listing to AIO Sentinel and updated the WordPress.org packaging to comply with repository naming rules.
+* Replaced direct filesystem writes with WordPress's filesystem abstraction and moved new quarantine data to the uploads directory.
+* Retained legacy quarantine records for review and restoration after updating.
+* Resolved translation-context, readme, and administrative-request static-analysis findings.
 
 = 5.2.1 =
 * Hardened administrative security-action request handling and added an automated compatibility test matrix for supported WordPress and PHP versions.
@@ -95,7 +104,7 @@ The plugin automatically installs `mu-plugin/aio-plugin-sentinel-guard.php` to `
  = 4.2.0 =
 * Explicitly preserves and migrates site settings without overwriting existing choices during activation, reactivation, or ZIP replacement.
 * Displays the new integrity baseline as clean immediately after it is created.
-* Added AIO Web Designs branding and a direct link to aiowebdesigns.com in the Plugin Sentinel tools screen.
+* Added AIO Web Designs branding and a direct link to aiowebdesigns.com in the AIO Sentinel tools screen.
 
  = 4.1.2 =
 * Reports one critical finding per blocked plugin directory, matching the directory-level quarantine action.

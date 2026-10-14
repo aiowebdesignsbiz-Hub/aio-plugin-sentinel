@@ -148,26 +148,27 @@ class AIO_PS_Monitor {
 		$issues = array();
 		$guard = AIO_PS_Plugin::guard_status();
 		if ( empty( $guard['verified'] ) ) {
-			$issues[] = array( 'severity' => 'critical', 'code' => 'mu_guard_missing', 'message' => __( 'The AIO early-boot MU guard is missing or has been modified.', 'aio-plugin-sentinel' ) );
+			$issues[] = array( 'severity' => 'critical', 'code' => 'mu_guard_missing', 'message' => __( 'The AIO early-boot MU guard is missing or has been modified.', 'aio-sentinel' ) );
 		}
 		$next_scan = wp_next_scheduled( AIO_PS_Plugin::CRON_HOOK );
 		if ( ! $next_scan ) {
-			$issues[] = array( 'severity' => 'critical', 'code' => 'scan_unscheduled', 'message' => __( 'The scheduled Plugin Sentinel scan is not registered.', 'aio-plugin-sentinel' ) );
+			$issues[] = array( 'severity' => 'critical', 'code' => 'scan_unscheduled', 'message' => __( 'The scheduled AIO Sentinel scan is not registered.', 'aio-sentinel' ) );
 		}
 		if ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ) {
-			$issues[] = array( 'severity' => 'warning', 'code' => 'wp_cron_disabled', 'message' => __( 'WP-Cron is disabled. Confirm that the host scheduler calls wp-cron.php.', 'aio-plugin-sentinel' ) );
+			$issues[] = array( 'severity' => 'warning', 'code' => 'wp_cron_disabled', 'message' => __( 'WP-Cron is disabled. Confirm that the host scheduler calls wp-cron.php.', 'aio-sentinel' ) );
 		}
 		$last_scan = isset( $results['scanned_at'] ) ? strtotime( $results['scanned_at'] . ' UTC' ) : false;
 		$interval = self::interval_seconds( isset( $settings['scan_interval'] ) ? $settings['scan_interval'] : 'hourly' );
 		if ( ! $last_scan ) {
-			$issues[] = array( 'severity' => 'warning', 'code' => 'scan_never_completed', 'message' => __( 'No Plugin Sentinel scan has completed yet.', 'aio-plugin-sentinel' ) );
+			$issues[] = array( 'severity' => 'warning', 'code' => 'scan_never_completed', 'message' => __( 'No AIO Sentinel scan has completed yet.', 'aio-sentinel' ) );
 		} elseif ( time() - $last_scan > max( 900, $interval * 3 ) ) {
-			$issues[] = array( 'severity' => 'warning', 'code' => 'scan_stale', 'message' => __( 'The last completed scan is older than expected. Check traffic and the host cron scheduler.', 'aio-plugin-sentinel' ) );
+			$issues[] = array( 'severity' => 'warning', 'code' => 'scan_stale', 'message' => __( 'The last completed scan is older than expected. Check traffic and the host cron scheduler.', 'aio-sentinel' ) );
 		}
 		if ( ! empty( $settings['enforce_plugin_approval'] ) ) {
 			$drift = self::approval_drift();
 			if ( ! empty( $drift ) ) {
-				$issues[] = array( 'severity' => 'warning', 'code' => 'plugin_approval_drift', 'message' => sprintf( _n( '%d active plugin is not in the approved inventory.', '%d active plugins are not in the approved inventory.', count( $drift ), 'aio-plugin-sentinel' ), count( $drift ) ) );
+				/* translators: %d: number of active plugins outside the approved inventory. */
+				$issues[] = array( 'severity' => 'warning', 'code' => 'plugin_approval_drift', 'message' => sprintf( _n( '%d active plugin is not in the approved inventory.', '%d active plugins are not in the approved inventory.', count( $drift ), 'aio-sentinel' ), count( $drift ) ) );
 			}
 		}
 		$status = array( 'checked_at' => current_time( 'mysql', true ), 'next_scan' => $next_scan ? gmdate( 'Y-m-d H:i:s', $next_scan ) : '', 'issues' => $issues );

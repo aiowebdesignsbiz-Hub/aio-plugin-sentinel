@@ -3,7 +3,7 @@
  * Plugin uninstall behavior.
  *
  * Site security records are retained unless an administrator explicitly opted
- * into deletion in Plugin Sentinel settings before uninstalling the plugin.
+ * into deletion in AIO Sentinel settings before uninstalling the plugin.
  */
 
 defined( 'WP_UNINSTALL_PLUGIN' ) || exit;

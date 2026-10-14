@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: AIO Plugin Sentinel Guard
+ * Plugin Name: AIO Sentinel Guard
  * Description: Must-use early boot guard for known malicious plugin identifiers.
  * Version: 4.1.0
  * Author: AIO Web Designs
