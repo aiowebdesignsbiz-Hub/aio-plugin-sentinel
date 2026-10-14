@@ -3,6 +3,11 @@
   "description": "A WordPress security monitoring and controlled-response plugin.",
   "type": "wordpress-plugin",
   "license": "GPL-2.0-or-later",
+  "config": {
+    "allow-plugins": {
+      "dealerdirect/phpcodesniffer-composer-installer": true
+    }
+  },
   "require-dev": {
     "phpunit/phpunit": "^9.6",
     "wp-coding-standards/wpcs": "^3.1",
