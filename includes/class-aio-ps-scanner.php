@@ -169,7 +169,7 @@ class AIO_PS_Scanner {
 
 		if ( defined( 'WPMU_PLUGIN_DIR' ) && is_dir( WPMU_PLUGIN_DIR ) ) {
 			foreach ( $this->code_files( WPMU_PLUGIN_DIR ) as $file ) {
-				if ( 'aio-plugin-sentinel-guard.php' === basename( $file ) && defined( 'AIO_PS_GUARD_SHA256' ) && hash_equals( AIO_PS_GUARD_SHA256, strtoupper( (string) @hash_file( 'sha256', $file ) ) ) ) {
+				if ( $this->is_trusted_guard( $file ) ) {
 					continue;
 				}
 				$items[] = $this->file_item( $file, 'mu-plugin', basename( $file ) );
@@ -185,6 +185,10 @@ class AIO_PS_Scanner {
 		$uploads = wp_get_upload_dir();
 		if ( ! empty( $uploads['basedir'] ) && is_dir( $uploads['basedir'] ) ) {
 			foreach ( $this->code_files( $uploads['basedir'], true, 250 ) as $file ) {
+				// Quarantined code is retained for review, not treated as an active upload finding.
+				if ( $this->is_path_in_quarantine( $file ) ) {
+					continue;
+				}
 				$items[] = $this->file_item( $file, 'uploads', basename( $file ) );
 			}
 		}
@@ -194,6 +198,15 @@ class AIO_PS_Scanner {
 	private function file_item( $path, $location, $owner ) {
 		$relative = wp_normalize_path( str_replace( ABSPATH, '', $path ) );
 		return array( 'id' => $location . ':' . $relative, 'path' => $path, 'relative' => $relative, 'location' => $location, 'owner' => $owner );
+	}
+
+	/**
+	 * Avoid flagging the companion guard only when its exact shipped checksum and
+	 * expected must-use location both match. Any modified guard stays scannable.
+	 */
+	private function is_trusted_guard( $file ) {
+		$expected = defined( 'WPMU_PLUGIN_DIR' ) ? trailingslashit( WPMU_PLUGIN_DIR ) . 'aio-plugin-sentinel-guard.php' : '';
+		return $expected && realpath( $file ) === realpath( $expected ) && defined( 'AIO_PS_GUARD_SHA256' ) && hash_equals( AIO_PS_GUARD_SHA256, strtoupper( (string) @hash_file( 'sha256', $file ) ) );
 	}
 
 	private function inspect_file( $item ) {

@@ -4,7 +4,7 @@ Tags: security, malware, x-dav, integrity
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 5.3.1
+Stable tag: 5.3.2
 License: GPL-2.0-or-later
 
 Detects x-dav and fake-verification indicators, blocks malicious extensions, and provides controlled quarantine and integrity monitoring.
@@ -64,6 +64,10 @@ After the initial clean scan, create a baseline from Tools > AIO Sentinel. Revie
 The plugin automatically installs `mu-plugin/aio-plugin-sentinel-guard.php` to `wp-content/mu-plugins/aio-plugin-sentinel-guard.php` during activation and verifies it after updates. Tools > AIO Sentinel also provides Install or Repair and Download buttons. If your host prevents WordPress from writing to the MU plugins folder, download the guard there and upload it to that exact location. This companion has no settings page and intentionally starts before ordinary plugins.
 
 == Changelog ==
+
+= 5.3.2 =
+* Prevented the verified AIO Sentinel MU guard from being reported as malware by its own signature scan.
+* Excluded retained AIO Sentinel quarantine folders from upload scanning so quarantined evidence cannot generate recursive alerts.
 
 = 5.3.1 =
 * Shortened the repository summary to meet the WordPress.org readme limit.
