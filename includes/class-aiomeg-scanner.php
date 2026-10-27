@@ -236,7 +236,8 @@ class AIOMEG_Scanner {
 		if ( count( $obfuscation ) >= 2 ) {
 			$score += 25;
 		}
-		if ( ! empty( $obfuscation ) && ! empty( array_intersect( array( 'eval(', 'assert(', 'create_function(' ), $execution ) ) ) ) {
+		$dangerous_execution = array_intersect( array( 'eval(', 'assert(', 'create_function(' ), $execution );
+		if ( ! empty( $obfuscation ) && ! empty( $dangerous_execution ) ) {
 			$score += 50;
 		}
 		if ( 'uploads' === $item['location'] ) {
