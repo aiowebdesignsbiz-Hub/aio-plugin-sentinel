@@ -1,10 +1,10 @@
-=== AIO Sentinel ===
+=== AIO Malicious Extension Guard ===
 Contributors: aiowebdesigns
 Tags: security, malware, x-dav, integrity
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 5.3.2
+Stable tag: 5.6.0
 License: GPL-2.0-or-later
 
 Detects x-dav and fake-verification indicators, blocks malicious extensions, and provides controlled quarantine and integrity monitoring.
@@ -37,43 +37,91 @@ Review-level findings are not automatically quarantined. Export the evidence rep
 
 == Privacy and retention ==
 
-AIO Sentinel keeps scan results, integrity hashes, approval records, configured notification recipients, and audit data in the local WordPress database. It does not send that data to AIO Web Designs. Public-page monitoring is optional and only requests this site's own URLs.
+AIO Malicious Extension Guard keeps scan results, integrity hashes, approval records, configured notification recipients, and audit data in the local WordPress database. It does not send that data to AIO Web Designs. Public-page monitoring is optional and only requests this site's own URLs.
 
-Records are retained on uninstall by default. An administrator may opt in to delete AIO Sentinel database records on uninstall from Tools > AIO Sentinel. The quarantine directory and MU guard are intentionally never removed automatically so they remain available for review.
+Records are retained on uninstall by default. An administrator may opt in to delete AIO Malicious Extension Guard database records on uninstall from Tools > AIO Malicious Extension Guard. The quarantine directory and MU guard are intentionally never removed automatically so they remain available for review.
 
-AIO Sentinel has no telemetry or remote code delivery. Its only optional network request is public-page monitoring, which is off by default and checks this site's own URLs. Notification emails use the site's configured WordPress mail service only after an administrator configures or accepts the site administrator recipient.
+AIO Malicious Extension Guard has no telemetry or remote code delivery. Its only optional network request is public-page monitoring, which is off by default and checks this site's own URLs. Notification emails use the site's configured WordPress mail service only after an administrator configures or accepts the site administrator recipient.
 
 The plugin also adds this disclosure to WordPress's built-in Privacy Policy guide under Settings > Privacy, so site owners can include accurate local data-handling information in their policy.
 
 == Installation ==
 
-1. Zip the `aio-sentinel` directory.
+1. Zip the `aio-malicious-extension-guard` directory.
 2. In WordPress, go to Plugins > Add New > Upload Plugin.
 3. Upload the ZIP and activate it.
-4. Go to Tools > AIO Sentinel and run the first scan.
+4. Go to Tools > AIO Malicious Extension Guard and run the first scan.
 5. Configure the scan interval, notification recipients, and any approved administrator accounts.
 
 == Updates and settings ==
 
-AIO Sentinel updates are non-destructive. Replacing an older version with a newer AIO Sentinel ZIP keeps the website's existing settings, scan schedule, notification recipients, approved administrator list, integrity baseline, latest scan results, and cleanup audit log. New releases only add defaults for settings that did not exist in earlier versions.
+AIO Malicious Extension Guard updates are non-destructive. Replacing an older version with a newer AIO Malicious Extension Guard ZIP keeps the website's existing settings, scan schedule, notification recipients, approved administrator list, integrity baseline, latest scan results, and cleanup audit log. New releases only add defaults for settings that did not exist in earlier versions.
 
 == Hardening ==
 
-After the initial clean scan, create a baseline from Tools > AIO Sentinel. Review and refresh it only after approved plugin changes. For a stronger operational control, test and then add `define( 'DISALLOW_FILE_MODS', true );` to wp-config.php; this disables dashboard plugin and theme installs, updates, and edits.
+After the initial clean scan, create a baseline from Tools > AIO Malicious Extension Guard. Review and refresh it only after approved plugin changes. For a stronger operational control, test and then add `define( 'DISALLOW_FILE_MODS', true );` to wp-config.php; this disables dashboard plugin and theme installs, updates, and edits.
 
-The plugin automatically installs `mu-plugin/aio-plugin-sentinel-guard.php` to `wp-content/mu-plugins/aio-plugin-sentinel-guard.php` during activation and verifies it after updates. Tools > AIO Sentinel also provides Install or Repair and Download buttons. If your host prevents WordPress from writing to the MU plugins folder, download the guard there and upload it to that exact location. This companion has no settings page and intentionally starts before ordinary plugins.
+The plugin automatically installs `mu-plugin/aio-plugin-sentinel-guard.php` to `wp-content/mu-plugins/aio-plugin-sentinel-guard.php` during activation and verifies it after updates. Tools > AIO Malicious Extension Guard also provides Install or Repair and Download buttons. If your host prevents WordPress from writing to the MU plugins folder, download the guard there and upload it to that exact location. This companion has no settings page and intentionally starts before ordinary plugins.
 
 == Changelog ==
 
+= 5.6.0 =
+* Renamed the public package to AIO Malicious Extension Guard and adopted the reserved WordPress.org slug and text domain.
+* Replaced generic public identifiers with the distinct AIOMEG prefix.
+* Added a one-time, non-destructive import of AIO Sentinel settings, scan history, baseline, approvals, alerts, and audit records.
+* Derived the standard plugins directory from the installed plugin path for compatibility with custom WordPress content directories.
+
+= 5.5.1 =
+* Fixed false-positive malware findings for the expected AIO Malicious Extension Guard MU guard and files retained in AIO Malicious Extension Guard quarantine.
+* The expected MU-guard path is now excluded from pattern scanning because it deliberately contains known malicious plugin identifiers. Its checksum remains independently verified through Protection Health and a changed guard remains a critical condition.
+* Hardened quarantine-path detection on hosts with inconsistent filesystem path resolution, so retained evidence is not re-scanned as active executable uploads.
+
+= 5.5.0 =
+* Added a clear animated scan-in-progress state and outcome toasts. Green results distinguish a completed scan with no known critical malware indicators from review-level items; red results list critical locations needing investigation.
+* Added a first-run security gate. New installations show only Run Initial Scan until the plugin has inspected the site, so unreviewed plugins cannot be accidentally approved before the first security check.
+* Automatically records the active AIO Malicious Extension Guard package in the local approval ledger after each completed scan. No other plugin is automatically trusted.
+* Hides all plugin-approval controls while critical findings are present, preventing accidental approval of a suspicious plugin.
+* Cleanup completion notices now state how many critical items were moved to protected quarantine and clearly distinguish quarantine errors that need follow-up.
+
+= 5.4.5 =
+* Replaced the browser confirmation popup for incident cleanup with a visible, required server-validated acknowledgment. This is clearer for administrators and avoids popup interruptions while keeping explicit approval before quarantine.
+
+= 5.4.4 =
+* Improved incident cleanup on hosts where the WordPress filesystem transport is slow or unavailable. Quarantine now prefers a validated direct, atomic move and falls back to the WordPress filesystem API only when needed.
+* Writes quarantine protection files and the audit record without requiring the filesystem transport, while retaining the existing WordPress fallback.
+
+= 5.4.3 =
+* Clearly identifies critical scan findings as the reason plugin approvals are temporarily unavailable, instead of allowing a blocked save to look like an approval-record issue.
+* Disables the inventory approval action until current critical findings are resolved or quarantined, and lists the exact blockers with the controlled-cleanup path.
+* Returns a count-specific server-side explanation if a fresh scan detects new critical findings during approval.
+
+= 5.4.2 =
+* Clarified that a scan alone does not approve plugins and renamed the inventory action to Save Selected Plugin Approvals.
+* Removed the redundant browser confirmation from the approval action; the server-validated review acknowledgment and fresh-scan gate remain required.
+* Verifies that selected approval records persist before reporting approval success.
+
+= 5.4.1 =
+* Fixed the plugin-inventory approval and revoke forms to render WordPress security tokens directly instead of applying unnecessary output filtering.
+* Sends explicit no-cache headers on the AIO Malicious Extension Guard administration screen to avoid stale browser or host-cached approval tokens.
+
+= 5.4.0 =
+* Replaced the all-or-nothing inventory approval action with selectable per-plugin approval controls.
+* Moved current approved plugins into a compact, expandable Previously Approved Plugins section with a safe revoke-approval action that never changes the plugin itself.
+* Keeps changed or newly discovered plugins in the primary review list so the approval screen stays focused on actionable work.
+
+= 5.3.3 =
+* Added a narrowly scoped signature for the verified WP Asset Cache malware family: its CFX command-and-control identifiers and persistence markers are now critical findings.
+* Added `asset-cache` to the regular-plugin and early-boot MU guard blocklists, preventing known reuse of that malicious identifier.
+
 = 5.3.2 =
-* Prevented the verified AIO Sentinel MU guard from being reported as malware by its own signature scan.
-* Excluded retained AIO Sentinel quarantine folders from upload scanning so quarantined evidence cannot generate recursive alerts.
+* Prevented the verified AIO Malicious Extension Guard MU guard from being reported as malware by its own signature scan.
+* Excluded retained AIO Malicious Extension Guard quarantine folders from upload scanning so quarantined evidence cannot generate recursive alerts.
 
 = 5.3.1 =
 * Shortened the repository summary to meet the WordPress.org readme limit.
 
 = 5.3.0 =
-* Renamed the public listing to AIO Sentinel and updated the WordPress.org packaging to comply with repository naming rules.
+* Renamed the public listing to AIO Malicious Extension Guard and updated the WordPress.org packaging to comply with repository naming rules.
 * Replaced direct filesystem writes with WordPress's filesystem abstraction and moved new quarantine data to the uploads directory.
 * Retained legacy quarantine records for review and restoration after updating.
 * Resolved translation-context, readme, and administrative-request static-analysis findings.
@@ -108,7 +156,7 @@ The plugin automatically installs `mu-plugin/aio-plugin-sentinel-guard.php` to `
  = 4.2.0 =
 * Explicitly preserves and migrates site settings without overwriting existing choices during activation, reactivation, or ZIP replacement.
 * Displays the new integrity baseline as clean immediately after it is created.
-* Added AIO Web Designs branding and a direct link to aiowebdesigns.com in the AIO Sentinel tools screen.
+* Added AIO Web Designs branding and a direct link to aiowebdesigns.com in the AIO Malicious Extension Guard tools screen.
 
  = 4.1.2 =
 * Reports one critical finding per blocked plugin directory, matching the directory-level quarantine action.

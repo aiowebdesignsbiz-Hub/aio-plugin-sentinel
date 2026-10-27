@@ -1,6 +1,6 @@
-# AIO Sentinel
+# AIO Malicious Extension Guard
 
-AIO Sentinel helps WordPress administrators monitor for known x-dav and fake-verification indicators, unexpected executable-file changes, and unapproved plugin changes. It provides controlled quarantine, evidence export, an optional early-boot MU guard, and scheduled monitoring.
+AIO Malicious Extension Guard helps WordPress administrators monitor for known x-dav and fake-verification indicators, unexpected executable-file changes, and unapproved plugin changes. It provides controlled quarantine, evidence export, an optional early-boot MU guard, and scheduled monitoring.
 
 ## What it protects
 
@@ -16,7 +16,7 @@ This plugin reduces risk. It cannot guarantee protection after a hosting account
 
 ## Full-directory approval
 
-The approved-plugin ledger is deliberately stricter than a main-file checksum. When an administrator approves inventory, Sentinel runs a fresh scan and creates a deterministic SHA-256 fingerprint from the path, checksum, and size of every regular file inside each plugin directory. Any file change requires a new review. Existing approvals from older releases are intentionally shown as requiring review because they did not include this full-directory fingerprint.
+The approved-plugin ledger is deliberately stricter than a main-file checksum. When an administrator approves inventory, AIO Malicious Extension Guard runs a fresh scan and creates a deterministic SHA-256 fingerprint from the path, checksum, and size of every regular file inside each plugin directory. Any file change requires a new review. Existing approvals from older releases are intentionally shown as requiring review because they did not include this full-directory fingerprint.
 
 ## False positives
 
@@ -24,7 +24,7 @@ See [docs/FALSE-POSITIVES.md](docs/FALSE-POSITIVES.md). Do not use the one-click
 
 ## Privacy and retention
 
-See [PRIVACY.md](PRIVACY.md) and [docs/DATA-RETENTION.md](docs/DATA-RETENTION.md). Sentinel stores its monitoring data in the WordPress database. It does not send data to AIO Web Designs. Public-page monitoring is optional and only requests this site's own URLs.
+See [PRIVACY.md](PRIVACY.md) and [docs/DATA-RETENTION.md](docs/DATA-RETENTION.md). AIO Malicious Extension Guard stores its monitoring data in the WordPress database. It does not send data to AIO Web Designs. Public-page monitoring is optional and only requests this site's own URLs.
 
 On supported WordPress versions, the plugin contributes this disclosure to the site's built-in Privacy Policy guide. Site owners remain responsible for reviewing that suggested text and publishing an appropriate site privacy policy.
 

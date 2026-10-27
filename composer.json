@@ -1,5 +1,5 @@
 {
-  "name": "aiowebdesigns/aio-sentinel",
+  "name": "aiowebdesigns/aio-malicious-extension-guard",
   "description": "A WordPress security monitoring and controlled-response plugin.",
   "type": "wordpress-plugin",
   "license": "GPL-2.0-or-later",

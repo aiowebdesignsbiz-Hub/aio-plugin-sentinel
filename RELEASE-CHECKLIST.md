@@ -1,10 +1,10 @@
 # Public Release Checklist
 
-Use this checklist for every public AIO Sentinel release. Do not publish a ZIP or WordPress.org SVN tag until every required gate is complete.
+Use this checklist for every public AIO Malicious Extension Guard release. Do not publish a ZIP or WordPress.org SVN tag until every required gate is complete.
 
 ## Required release gates
 
-- [ ] Set the release version in `aio-sentinel.php` and `readme.txt`, and add a factual changelog entry.
+- [ ] Set the release version in `aio-malicious-extension-guard.php` and `readme.txt`, and add a factual changelog entry.
 - [ ] Run `composer run lint` and `composer test` in a WordPress/MySQL test environment.
 - [ ] Confirm the GitHub Actions matrix is green for the supported PHP floor and a current PHP release.
 - [ ] Manually test a clean installation, scan, baseline, approved-plugin review, alert email, evidence export, MU guard repair, quarantine, restore-without-activation, update retention, deactivation, and both uninstall retention choices.

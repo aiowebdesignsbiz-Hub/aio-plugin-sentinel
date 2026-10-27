@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Report suspected vulnerabilities in AIO Sentinel privately to AIO Web Designs through the contact form at https://aiowebdesigns.com/. Include the plugin version, affected WordPress and PHP versions, clear reproduction steps, and a minimally sufficient proof of concept. Do not include live credentials or publish exploit details before a fix is available.
+Report suspected vulnerabilities in AIO Malicious Extension Guard privately to AIO Web Designs through the contact form at https://aiowebdesigns.com/. Include the plugin version, affected WordPress and PHP versions, clear reproduction steps, and a minimally sufficient proof of concept. Do not include live credentials or publish exploit details before a fix is available.
 
 ## Security review controls
 

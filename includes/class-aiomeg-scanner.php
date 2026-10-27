@@ -2,13 +2,13 @@
 
 defined( 'ABSPATH' ) || exit;
 
-class AIO_PS_Scanner {
+class AIOMEG_Scanner {
 
-	const OPTION_RESULTS  = 'aio_ps_scan_results';
-	const OPTION_BASELINE = 'aio_ps_integrity_baseline';
+	const OPTION_RESULTS  = 'aiomeg_scan_results';
+	const OPTION_BASELINE = 'aiomeg_integrity_baseline';
 
 	private $blocked_slugs = array(
-		'xdav-tracker', 'xdav-trackerd', 'google-api-updates', 'responsive-block-suite', 'suspicious-plugin-cleaner', 'block-lab-pro',
+		'xdav-tracker', 'xdav-trackerd', 'google-api-updates', 'responsive-block-suite', 'suspicious-plugin-cleaner', 'block-lab-pro', 'asset-cache',
 	);
 
 	private $deception_markers = array(
@@ -21,6 +21,15 @@ class AIO_PS_Scanner {
 
 	private $execution_markers = array(
 		'eval(', 'assert(', 'create_function(', 'preg_replace(', '$_post', '$_request', '$_cookie',
+	);
+
+	/*
+	 * Verified WP Asset Cache malware indicators observed in the 2026 RevitalyzeMD
+	 * incident. Require two independent indicators to avoid treating legitimate
+	 * caching extensions as malicious.
+	 */
+	private $asset_cache_markers = array(
+		'cfx_cfg_url', 'cfx_ads_url', 'cfx_proxy_auth', 'vdndenbroek.lol', 'api/wpcfg',
 	);
 
 	public function scan() {
@@ -63,7 +72,7 @@ class AIO_PS_Scanner {
 		$results = $this->scan();
 		foreach ( $results['findings'] as $finding ) {
 			if ( 'critical' === $finding['severity'] ) {
-				return new WP_Error( 'aio_ps_critical_findings', __( 'Baseline was not created because critical findings need review first.', 'aio-sentinel' ) );
+				return new WP_Error( 'aiomeg_critical_findings', __( 'Baseline was not created because critical findings need review first.', 'aio-malicious-extension-guard' ) );
 			}
 		}
 		$manifest = array();
@@ -152,13 +161,14 @@ class AIO_PS_Scanner {
 
 	private function scan_files() {
 		$items = array();
-		$single_file_plugins = glob( WP_PLUGIN_DIR . '/*.php' );
+		$plugins_directory = AIOMEG_Plugin::plugins_directory();
+		$single_file_plugins = glob( trailingslashit( $plugins_directory ) . '*.php' );
 		foreach ( is_array( $single_file_plugins ) ? $single_file_plugins : array() as $file ) {
 			$items[] = $this->file_item( $file, 'plugin', pathinfo( $file, PATHINFO_FILENAME ) );
 		}
-		$plugin_dirs = glob( WP_PLUGIN_DIR . '/*', GLOB_ONLYDIR );
+		$plugin_dirs = glob( trailingslashit( $plugins_directory ) . '*', GLOB_ONLYDIR );
 		foreach ( is_array( $plugin_dirs ) ? $plugin_dirs : array() as $directory ) {
-			if ( defined( 'AIO_PS_DIR' ) && realpath( $directory ) === realpath( AIO_PS_DIR ) ) {
+			if ( defined( 'AIOMEG_DIR' ) && realpath( $directory ) === realpath( AIOMEG_DIR ) ) {
 				continue;
 			}
 			$slug = basename( $directory );
@@ -169,7 +179,7 @@ class AIO_PS_Scanner {
 
 		if ( defined( 'WPMU_PLUGIN_DIR' ) && is_dir( WPMU_PLUGIN_DIR ) ) {
 			foreach ( $this->code_files( WPMU_PLUGIN_DIR ) as $file ) {
-				if ( $this->is_trusted_guard( $file ) ) {
+				if ( $this->is_sentinel_guard_path( $file ) ) {
 					continue;
 				}
 				$items[] = $this->file_item( $file, 'mu-plugin', basename( $file ) );
@@ -201,12 +211,14 @@ class AIO_PS_Scanner {
 	}
 
 	/**
-	 * Avoid flagging the companion guard only when its exact shipped checksum and
-	 * expected must-use location both match. Any modified guard stays scannable.
+	 * The companion guard intentionally contains malware names and activation
+	 * filters, so it must never be pattern-scanned as malware. Its integrity is
+	 * verified separately by Protection Health, which reports a changed guard as
+	 * a critical condition without risking quarantine of the protection layer.
 	 */
-	private function is_trusted_guard( $file ) {
+	private function is_sentinel_guard_path( $file ) {
 		$expected = defined( 'WPMU_PLUGIN_DIR' ) ? trailingslashit( WPMU_PLUGIN_DIR ) . 'aio-plugin-sentinel-guard.php' : '';
-		return $expected && realpath( $file ) === realpath( $expected ) && defined( 'AIO_PS_GUARD_SHA256' ) && hash_equals( AIO_PS_GUARD_SHA256, strtoupper( (string) @hash_file( 'sha256', $file ) ) );
+		return $expected && realpath( $file ) === realpath( $expected );
 	}
 
 	private function inspect_file( $item ) {
@@ -218,12 +230,13 @@ class AIO_PS_Scanner {
 		$deception = $this->matching_markers( $lower, $this->deception_markers );
 		$obfuscation = $this->matching_markers( $lower, $this->obfuscation_markers );
 		$execution = $this->matching_markers( $lower, $this->execution_markers );
+		$asset_cache = $this->matching_markers( $lower, $this->asset_cache_markers );
 		$exact_slug = 'plugin' === $item['location'] && $this->is_blocked_slug( $item['owner'] );
-		$score = $exact_slug || ! empty( $deception ) ? 100 : 0;
+		$score = $exact_slug || ! empty( $deception ) || count( $asset_cache ) >= 2 ? 100 : 0;
 		if ( count( $obfuscation ) >= 2 ) {
 			$score += 25;
 		}
-		if ( ! empty( $obfuscation ) && array_intersect( array( 'eval(', 'assert(', 'create_function(' ), $execution ) ) {
+		if ( ! empty( $obfuscation ) && ! empty( array_intersect( array( 'eval(', 'assert(', 'create_function(' ), $execution ) ) ) ) {
 			$score += 50;
 		}
 		if ( 'uploads' === $item['location'] ) {
@@ -235,37 +248,53 @@ class AIO_PS_Scanner {
 		return array(
 			'id' => $item['id'], 'location' => $item['location'], 'owner' => $item['owner'], 'file' => $item['relative'],
 			'severity' => $score >= 100 ? 'critical' : 'review', 'exact_slug' => $exact_slug,
-			'markers' => array_merge( $deception, $obfuscation, $execution ),
+			'markers' => array_merge( $deception, $asset_cache, $obfuscation, $execution ),
 		);
 	}
 
 	private function quarantine_finding( $finding ) {
 		$source = ABSPATH . ltrim( $finding['file'], '/\\' );
 		if ( 'plugin' === $finding['location'] ) {
-			$directory = WP_PLUGIN_DIR . '/' . $finding['owner'];
+			$directory = trailingslashit( AIOMEG_Plugin::plugins_directory() ) . $finding['owner'];
 			if ( is_dir( $directory ) ) {
 				$source = $directory;
 			}
 		}
 		if ( ! file_exists( $source ) || ! $this->is_allowed_source( $source, $finding['location'] ) ) {
-			return new WP_Error( 'aio_ps_invalid_source', __( 'The finding is no longer in a permitted active location.', 'aio-sentinel' ) );
+			return new WP_Error( 'aiomeg_invalid_source', __( 'The finding is no longer in a permitted active location.', 'aio-malicious-extension-guard' ) );
 		}
-		$filesystem = $this->filesystem();
 		$quarantine = $this->quarantine_directory();
-		if ( ! $filesystem || ( ! $filesystem->is_dir( $quarantine ) && ! $filesystem->mkdir( $quarantine, FS_CHMOD_DIR ) ) ) {
-			return new WP_Error( 'aio_ps_quarantine_unavailable', __( 'Could not create the quarantine directory.', 'aio-sentinel' ) );
+		if ( ! $this->ensure_quarantine_directory( $quarantine ) ) {
+			return new WP_Error( 'aiomeg_quarantine_unavailable', __( 'Could not create the quarantine directory.', 'aio-malicious-extension-guard' ) );
 		}
 		$this->protect_quarantine( $quarantine );
 		$destination = $quarantine . '/' . gmdate( 'Ymd-His' ) . '-' . sanitize_file_name( basename( $source ) );
-		// phpcs:ignore PluginCheck.CodeAnalysis.WriteFile.PluginDirectoryWrite -- Critical findings are moved from an active location into uploads-based quarantine for safe review.
-		if ( ! $filesystem->move( $source, $destination, false ) ) {
-			return new WP_Error( 'aio_ps_quarantine_failed', __( 'Could not move the finding to quarantine. Check file permissions.', 'aio-sentinel' ) );
+		/*
+		 * A direct rename is an atomic move on the usual single-filesystem WordPress
+		 * layout. It avoids a slow remote filesystem transport during an incident.
+		 */
+		$moved = @rename( $source, $destination ); // phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename -- Controlled quarantine move after path validation.
+		if ( ! $moved ) {
+			$filesystem = $this->filesystem();
+			// phpcs:ignore PluginCheck.CodeAnalysis.WriteFile.PluginDirectoryWrite -- Critical findings are moved from an active location into uploads-based quarantine for safe review.
+			$moved = $filesystem && $filesystem->move( $source, $destination, false );
+		}
+		if ( ! $moved ) {
+			return new WP_Error( 'aiomeg_quarantine_failed', __( 'Could not move the finding to quarantine. Check file permissions.', 'aio-malicious-extension-guard' ) );
 		}
 		if ( 'plugin' === $finding['location'] ) {
 			$this->deactivate_plugin_owner( $finding['owner'] );
 		}
 		$this->write_quarantine_log( $finding, $source, $destination );
 		return true;
+	}
+
+	private function ensure_quarantine_directory( $directory ) {
+		if ( is_dir( $directory ) || wp_mkdir_p( $directory ) ) {
+			return true;
+		}
+		$filesystem = $this->filesystem();
+		return $filesystem && ( $filesystem->is_dir( $directory ) || $filesystem->mkdir( $directory, FS_CHMOD_DIR ) );
 	}
 
 	/**
@@ -311,27 +340,27 @@ class AIO_PS_Scanner {
 				$destination = ! empty( $entry['destination_path'] ) ? $entry['destination_path'] : ABSPATH . ltrim( $entry['destination'], '/\\' );
 				$filesystem = $this->filesystem();
 				if ( ! file_exists( $destination ) ) {
-					return new WP_Error( 'aio_ps_restore_missing', __( 'The quarantined item is no longer available.', 'aio-sentinel' ) );
+					return new WP_Error( 'aiomeg_restore_missing', __( 'The quarantined item is no longer available.', 'aio-malicious-extension-guard' ) );
 				}
 				if ( ! $filesystem || ! $this->is_safe_restore_path( $source ) || ! $this->is_path_in_quarantine( $destination ) ) {
-					return new WP_Error( 'aio_ps_restore_invalid', __( 'The requested restore item is outside the permitted quarantine paths.', 'aio-sentinel' ) );
+					return new WP_Error( 'aiomeg_restore_invalid', __( 'The requested restore item is outside the permitted quarantine paths.', 'aio-malicious-extension-guard' ) );
 				}
 				if ( file_exists( $source ) ) {
-					return new WP_Error( 'aio_ps_restore_exists', __( 'The original location is already occupied, so nothing was restored.', 'aio-sentinel' ) );
+					return new WP_Error( 'aiomeg_restore_exists', __( 'The original location is already occupied, so nothing was restored.', 'aio-malicious-extension-guard' ) );
 				}
 				// phpcs:ignore PluginCheck.CodeAnalysis.WriteFile.PluginDirectoryWrite -- Restore is an explicit administrator action after false-positive review.
 				if ( ! wp_mkdir_p( dirname( $source ) ) || ! $filesystem->move( $destination, $source, false ) ) {
-					return new WP_Error( 'aio_ps_restore_failed', __( 'WordPress could not restore the quarantined item. Check hosting file permissions.', 'aio-sentinel' ) );
+					return new WP_Error( 'aiomeg_restore_failed', __( 'WordPress could not restore the quarantined item. Check hosting file permissions.', 'aio-malicious-extension-guard' ) );
 				}
 				return true;
 			}
 		}
-		return new WP_Error( 'aio_ps_restore_unknown', __( 'The requested quarantine record could not be found.', 'aio-sentinel' ) );
+		return new WP_Error( 'aiomeg_restore_unknown', __( 'The requested quarantine record could not be found.', 'aio-malicious-extension-guard' ) );
 	}
 
 	private function is_allowed_source( $source, $location ) {
 		$roots = array(
-			'plugin' => WP_PLUGIN_DIR,
+			'plugin' => AIOMEG_Plugin::plugins_directory(),
 			'mu-plugin' => defined( 'WPMU_PLUGIN_DIR' ) ? WPMU_PLUGIN_DIR : '',
 			'drop-in' => WP_CONTENT_DIR,
 			'uploads' => wp_get_upload_dir()['basedir'],
@@ -347,7 +376,7 @@ class AIO_PS_Scanner {
 
 	private function is_safe_restore_path( $path ) {
 		$path = wp_normalize_path( $path );
-		foreach ( array( WP_PLUGIN_DIR, defined( 'WPMU_PLUGIN_DIR' ) ? WPMU_PLUGIN_DIR : '', wp_get_upload_dir()['basedir'] ) as $root ) {
+		foreach ( array( AIOMEG_Plugin::plugins_directory(), defined( 'WPMU_PLUGIN_DIR' ) ? WPMU_PLUGIN_DIR : '', wp_get_upload_dir()['basedir'] ) as $root ) {
 			$root = wp_normalize_path( $root );
 			if ( $root && 0 === strpos( $path, trailingslashit( $root ) ) ) {
 				return true;
@@ -416,10 +445,6 @@ class AIO_PS_Scanner {
 	}
 
 	private function protect_quarantine( $directory ) {
-		$filesystem = $this->filesystem();
-		if ( ! $filesystem ) {
-			return;
-		}
 		$files = array(
 			'index.php'  => "<?php // Silence is golden.\n",
 			'.htaccess'  => "Require all denied\nDeny from all\n",
@@ -427,39 +452,60 @@ class AIO_PS_Scanner {
 		);
 		foreach ( $files as $name => $contents ) {
 			$file = trailingslashit( $directory ) . $name;
-			if ( ! $filesystem->exists( $file ) ) {
-				$filesystem->put_contents( $file, $contents, FS_CHMOD_FILE );
+			if ( ! file_exists( $file ) ) {
+				if ( false === @file_put_contents( $file, $contents ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Protecting the plugin-owned quarantine directory.
+					$filesystem = $this->filesystem();
+					if ( $filesystem ) {
+						$filesystem->put_contents( $file, $contents, FS_CHMOD_FILE );
+					}
+				}
 			}
 		}
 	}
 
 	private function write_quarantine_log( $finding, $source, $destination ) {
-		$filesystem = $this->filesystem();
-		if ( ! $filesystem ) {
-			return;
-		}
 		$entry = array( 'time' => current_time( 'mysql', true ), 'source' => $finding['file'], 'source_path' => wp_normalize_path( str_replace( ABSPATH, '', $source ) ), 'destination_path' => wp_normalize_path( $destination ) );
 		$log = trailingslashit( $this->quarantine_directory() ) . 'manifest.log';
-		$existing = $filesystem->exists( $log ) ? $filesystem->get_contents( $log ) : '';
-		$filesystem->put_contents( $log, $existing . wp_json_encode( $entry ) . "\n", FS_CHMOD_FILE );
+		$line = wp_json_encode( $entry ) . "\n";
+		if ( false !== @file_put_contents( $log, $line, FILE_APPEND | LOCK_EX ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Appending a protected quarantine audit record.
+			return;
+		}
+		$filesystem = $this->filesystem();
+		if ( $filesystem ) {
+			$existing = $filesystem->exists( $log ) ? $filesystem->get_contents( $log ) : '';
+			$filesystem->put_contents( $log, $existing . $line, FS_CHMOD_FILE );
+		}
 	}
 
 	private function quarantine_directory() {
 		$uploads = wp_get_upload_dir();
-		return trailingslashit( $uploads['basedir'] ) . 'aio-sentinel-quarantine';
+		return trailingslashit( $uploads['basedir'] ) . 'aio-malicious-extension-guard-quarantine';
 	}
 
 	private function quarantine_directories() {
 		$directories = array( $this->quarantine_directory() );
-		$legacy = WP_CONTENT_DIR . '/aio-plugin-sentinel-quarantine';
-		if ( $legacy !== $directories[0] ) {
-			$directories[] = $legacy;
+		$uploads = wp_get_upload_dir();
+		$legacy_directories = array(
+			trailingslashit( $uploads['basedir'] ) . 'aio-sentinel-quarantine',
+			WP_CONTENT_DIR . '/aio-plugin-sentinel-quarantine',
+		);
+		foreach ( $legacy_directories as $legacy ) {
+			if ( $legacy !== $directories[0] ) {
+				$directories[] = $legacy;
+			}
 		}
 		return $directories;
 	}
 
 	private function is_path_in_quarantine( $path ) {
 		foreach ( $this->quarantine_directories() as $directory ) {
+			// Use a normalized prefix first so protected evidence remains excluded
+			// even where a host's filesystem resolves paths inconsistently.
+			$normalized_path = wp_normalize_path( $path );
+			$normalized_directory = trailingslashit( wp_normalize_path( $directory ) );
+			if ( 0 === strpos( $normalized_path, $normalized_directory ) ) {
+				return true;
+			}
 			if ( $this->is_path_in_root( $path, $directory ) ) {
 				return true;
 			}

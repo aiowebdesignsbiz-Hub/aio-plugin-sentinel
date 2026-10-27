@@ -3,28 +3,28 @@
  * Plugin uninstall behavior.
  *
  * Site security records are retained unless an administrator explicitly opted
- * into deletion in AIO Sentinel settings before uninstalling the plugin.
+ * into deletion in AIO Malicious Extension Guard settings before uninstalling the plugin.
  */
 
 defined( 'WP_UNINSTALL_PLUGIN' ) || exit;
 
-$settings = get_option( 'aio_ps_settings', array() );
-wp_clear_scheduled_hook( 'aio_ps_scheduled_scan' );
+$settings = get_option( 'aiomeg_settings', array() );
+wp_clear_scheduled_hook( 'aiomeg_scheduled_scan' );
 
 if ( empty( $settings['delete_data_on_uninstall'] ) ) {
 	return;
 }
 
 foreach ( array(
-	'aio_ps_settings',
-	'aio_ps_last_alert_fingerprint',
-	'aio_ps_cleanup_log',
-	'aio_ps_mu_guard_status',
-	'aio_ps_scan_results',
-	'aio_ps_integrity_baseline',
-	'aio_ps_plugin_approvals',
-	'aio_ps_health_status',
-	'aio_ps_external_monitor_results',
+	'aiomeg_settings',
+	'aiomeg_last_alert_fingerprint',
+	'aiomeg_cleanup_log',
+	'aiomeg_mu_guard_status',
+	'aiomeg_scan_results',
+	'aiomeg_integrity_baseline',
+	'aiomeg_plugin_approvals',
+	'aiomeg_health_status',
+	'aiomeg_external_monitor_results',
 ) as $option ) {
 	delete_option( $option );
 	if ( is_multisite() ) {

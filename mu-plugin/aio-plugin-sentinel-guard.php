@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: AIO Sentinel Guard
+ * Plugin Name: AIO Malicious Extension Guard (MU Guard)
  * Description: Must-use early boot guard for known malicious plugin identifiers.
  * Version: 4.1.0
  * Author: AIO Web Designs
@@ -12,7 +12,7 @@ defined( 'ABSPATH' ) || exit;
  * This file is intentionally standalone. Copy it directly to wp-content/mu-plugins/
  * so WordPress loads it before ordinary plugins.
  */
-function aio_ps_guard_blocked_slugs() {
+function aiomeg_guard_blocked_slugs() {
 	return array(
 		'xdav-tracker',
 		'xdav-trackerd',
@@ -20,14 +20,15 @@ function aio_ps_guard_blocked_slugs() {
 		'responsive-block-suite',
 		'suspicious-plugin-cleaner',
 		'block-lab-pro',
+		'asset-cache',
 	);
 }
 
-function aio_ps_guard_filter_active_plugins( $plugins ) {
+function aiomeg_guard_filter_active_plugins( $plugins ) {
 	if ( ! is_array( $plugins ) ) {
 		return $plugins;
 	}
-	$blocked = aio_ps_guard_blocked_slugs();
+	$blocked = aiomeg_guard_blocked_slugs();
 	$filtered = array_filter( $plugins, function( $plugin ) use ( $blocked ) {
 		$parts = explode( '/', ltrim( (string) $plugin, '/' ) );
 		if ( empty( $parts[0] ) ) {
@@ -39,11 +40,11 @@ function aio_ps_guard_filter_active_plugins( $plugins ) {
 	return array_values( $filtered );
 }
 
-function aio_ps_guard_filter_network_plugins( $plugins ) {
+function aiomeg_guard_filter_network_plugins( $plugins ) {
 	if ( ! is_array( $plugins ) ) {
 		return $plugins;
 	}
-	$blocked = aio_ps_guard_blocked_slugs();
+	$blocked = aiomeg_guard_blocked_slugs();
 	foreach ( array_keys( $plugins ) as $plugin ) {
 		$parts = explode( '/', ltrim( (string) $plugin, '/' ) );
 		$slug = empty( $parts[0] ) ? '' : ( count( $parts ) > 1 ? $parts[0] : pathinfo( $parts[0], PATHINFO_FILENAME ) );
@@ -54,9 +55,9 @@ function aio_ps_guard_filter_network_plugins( $plugins ) {
 	return $plugins;
 }
 
-add_filter( 'option_active_plugins', 'aio_ps_guard_filter_active_plugins', PHP_INT_MAX );
-add_filter( 'site_option_active_sitewide_plugins', 'aio_ps_guard_filter_network_plugins', PHP_INT_MAX );
+add_filter( 'option_active_plugins', 'aiomeg_guard_filter_active_plugins', PHP_INT_MAX );
+add_filter( 'site_option_active_sitewide_plugins', 'aiomeg_guard_filter_network_plugins', PHP_INT_MAX );
 
 /* Reject known malicious identifiers before WordPress persists plugin activation. */
-add_filter( 'pre_update_option_active_plugins', 'aio_ps_guard_filter_active_plugins', PHP_INT_MAX );
-add_filter( 'pre_update_site_option_active_sitewide_plugins', 'aio_ps_guard_filter_network_plugins', PHP_INT_MAX );
+add_filter( 'pre_update_option_active_plugins', 'aiomeg_guard_filter_active_plugins', PHP_INT_MAX );
+add_filter( 'pre_update_site_option_active_sitewide_plugins', 'aiomeg_guard_filter_network_plugins', PHP_INT_MAX );

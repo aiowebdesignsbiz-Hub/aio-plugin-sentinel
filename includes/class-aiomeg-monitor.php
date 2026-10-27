@@ -5,11 +5,11 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Site-level checks that complement the filesystem scanner without storing page content.
  */
-class AIO_PS_Monitor {
+class AIOMEG_Monitor {
 
-	const OPTION_APPROVALS = 'aio_ps_plugin_approvals';
-	const OPTION_HEALTH = 'aio_ps_health_status';
-	const OPTION_EXTERNAL = 'aio_ps_external_monitor_results';
+	const OPTION_APPROVALS = 'aiomeg_plugin_approvals';
+	const OPTION_HEALTH = 'aiomeg_health_status';
+	const OPTION_EXTERNAL = 'aiomeg_external_monitor_results';
 
 	public static function plugin_inventory() {
 		if ( ! function_exists( 'get_plugins' ) ) {
@@ -21,7 +21,7 @@ class AIO_PS_Monitor {
 		$approvals = (array) get_option( self::OPTION_APPROVALS, array() );
 		$inventory = array();
 		foreach ( $plugins as $plugin_file => $plugin ) {
-			$path = WP_PLUGIN_DIR . '/' . $plugin_file;
+			$path = trailingslashit( AIOMEG_Plugin::plugins_directory() ) . $plugin_file;
 			$hash = is_readable( $path ) ? hash_file( 'sha256', $path ) : false;
 			$directory = self::plugin_directory_fingerprint( $plugin_file );
 			$approval = isset( $approvals[ $plugin_file ] ) && is_array( $approvals[ $plugin_file ] ) ? $approvals[ $plugin_file ] : array();
@@ -45,24 +45,52 @@ class AIO_PS_Monitor {
 	}
 
 	public static function approve_current_inventory() {
+		return self::approve_plugins( array_keys( self::plugin_inventory() ) );
+	}
+
+	/**
+	 * Records only administrator-selected plugins after a clean scan. Each record
+	 * remains tied to both the main file and its complete directory fingerprint.
+	 */
+	public static function approve_plugins( $plugin_files, $approved_by = null ) {
 		$inventory = self::plugin_inventory();
 		$approvals = (array) get_option( self::OPTION_APPROVALS, array() );
 		$user = wp_get_current_user();
-		foreach ( $inventory as $plugin_file => $plugin ) {
-			if ( empty( $plugin['sha256'] ) ) {
+		$count = 0;
+		foreach ( array_unique( array_map( 'strval', (array) $plugin_files ) ) as $plugin_file ) {
+			if ( empty( $inventory[ $plugin_file ] ) || empty( $inventory[ $plugin_file ]['sha256'] ) || empty( $inventory[ $plugin_file ]['directory_complete'] ) ) {
 				continue;
 			}
+			$plugin = $inventory[ $plugin_file ];
 			$approvals[ $plugin_file ] = array(
 				'version' => $plugin['version'],
 				'sha256' => $plugin['sha256'],
 				'directory_sha256' => $plugin['directory_sha256'],
 				'directory_file_count' => $plugin['directory_file_count'],
 				'approved_at' => current_time( 'mysql', true ),
-				'approved_by' => $user && $user->exists() ? $user->user_login : '',
+				'approved_by' => null !== $approved_by ? sanitize_text_field( $approved_by ) : ( $user && $user->exists() ? $user->user_login : '' ),
 			);
+			$count++;
 		}
 		update_option( self::OPTION_APPROVALS, $approvals, false );
-		return count( $inventory );
+		return $count;
+	}
+
+	/**
+	 * Removes the local approval ledger entry only. It never deactivates,
+	 * modifies, or deletes the corresponding plugin.
+	 */
+	public static function revoke_plugin_approvals( $plugin_files ) {
+		$approvals = (array) get_option( self::OPTION_APPROVALS, array() );
+		$count = 0;
+		foreach ( array_unique( array_map( 'strval', (array) $plugin_files ) ) as $plugin_file ) {
+			if ( isset( $approvals[ $plugin_file ] ) ) {
+				unset( $approvals[ $plugin_file ] );
+				$count++;
+			}
+		}
+		update_option( self::OPTION_APPROVALS, $approvals, false );
+		return $count;
 	}
 
 	/**
@@ -73,7 +101,7 @@ class AIO_PS_Monitor {
 	 */
 	public static function plugin_directory_fingerprint( $plugin_file ) {
 		$plugin_file = ltrim( (string) $plugin_file, '/' );
-		$plugin_path = WP_PLUGIN_DIR . '/' . $plugin_file;
+		$plugin_path = trailingslashit( AIOMEG_Plugin::plugins_directory() ) . $plugin_file;
 		$root = false !== strpos( $plugin_file, '/' ) ? dirname( $plugin_path ) : $plugin_path;
 		if ( ! file_exists( $root ) ) {
 			return array( 'sha256' => '', 'file_count' => 0, 'complete' => false );
@@ -146,29 +174,29 @@ class AIO_PS_Monitor {
 
 	public static function health( $settings, $results ) {
 		$issues = array();
-		$guard = AIO_PS_Plugin::guard_status();
+		$guard = AIOMEG_Plugin::guard_status();
 		if ( empty( $guard['verified'] ) ) {
-			$issues[] = array( 'severity' => 'critical', 'code' => 'mu_guard_missing', 'message' => __( 'The AIO early-boot MU guard is missing or has been modified.', 'aio-sentinel' ) );
+			$issues[] = array( 'severity' => 'critical', 'code' => 'mu_guard_missing', 'message' => __( 'The AIO early-boot MU guard is missing or has been modified.', 'aio-malicious-extension-guard' ) );
 		}
-		$next_scan = wp_next_scheduled( AIO_PS_Plugin::CRON_HOOK );
+		$next_scan = wp_next_scheduled( AIOMEG_Plugin::CRON_HOOK );
 		if ( ! $next_scan ) {
-			$issues[] = array( 'severity' => 'critical', 'code' => 'scan_unscheduled', 'message' => __( 'The scheduled AIO Sentinel scan is not registered.', 'aio-sentinel' ) );
+			$issues[] = array( 'severity' => 'critical', 'code' => 'scan_unscheduled', 'message' => __( 'The scheduled AIO Malicious Extension Guard scan is not registered.', 'aio-malicious-extension-guard' ) );
 		}
 		if ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ) {
-			$issues[] = array( 'severity' => 'warning', 'code' => 'wp_cron_disabled', 'message' => __( 'WP-Cron is disabled. Confirm that the host scheduler calls wp-cron.php.', 'aio-sentinel' ) );
+			$issues[] = array( 'severity' => 'warning', 'code' => 'wp_cron_disabled', 'message' => __( 'WP-Cron is disabled. Confirm that the host scheduler calls wp-cron.php.', 'aio-malicious-extension-guard' ) );
 		}
 		$last_scan = isset( $results['scanned_at'] ) ? strtotime( $results['scanned_at'] . ' UTC' ) : false;
 		$interval = self::interval_seconds( isset( $settings['scan_interval'] ) ? $settings['scan_interval'] : 'hourly' );
 		if ( ! $last_scan ) {
-			$issues[] = array( 'severity' => 'warning', 'code' => 'scan_never_completed', 'message' => __( 'No AIO Sentinel scan has completed yet.', 'aio-sentinel' ) );
+			$issues[] = array( 'severity' => 'warning', 'code' => 'scan_never_completed', 'message' => __( 'No AIO Malicious Extension Guard scan has completed yet.', 'aio-malicious-extension-guard' ) );
 		} elseif ( time() - $last_scan > max( 900, $interval * 3 ) ) {
-			$issues[] = array( 'severity' => 'warning', 'code' => 'scan_stale', 'message' => __( 'The last completed scan is older than expected. Check traffic and the host cron scheduler.', 'aio-sentinel' ) );
+			$issues[] = array( 'severity' => 'warning', 'code' => 'scan_stale', 'message' => __( 'The last completed scan is older than expected. Check traffic and the host cron scheduler.', 'aio-malicious-extension-guard' ) );
 		}
 		if ( ! empty( $settings['enforce_plugin_approval'] ) ) {
 			$drift = self::approval_drift();
 			if ( ! empty( $drift ) ) {
 				/* translators: %d: number of active plugins outside the approved inventory. */
-				$issues[] = array( 'severity' => 'warning', 'code' => 'plugin_approval_drift', 'message' => sprintf( _n( '%d active plugin is not in the approved inventory.', '%d active plugins are not in the approved inventory.', count( $drift ), 'aio-sentinel' ), count( $drift ) ) );
+				$issues[] = array( 'severity' => 'warning', 'code' => 'plugin_approval_drift', 'message' => sprintf( _n( '%d active plugin is not in the approved inventory.', '%d active plugins are not in the approved inventory.', count( $drift ), 'aio-malicious-extension-guard' ), count( $drift ) ) );
 			}
 		}
 		$status = array( 'checked_at' => current_time( 'mysql', true ), 'next_scan' => $next_scan ? gmdate( 'Y-m-d H:i:s', $next_scan ) : '', 'issues' => $issues );
@@ -188,7 +216,7 @@ class AIO_PS_Monitor {
 		$urls = array_slice( array_values( array_unique( $urls ) ), 0, 12 );
 		$checks = array();
 		foreach ( $urls as $url ) {
-			$response = wp_remote_get( $url, array( 'timeout' => 15, 'redirection' => 3, 'user-agent' => 'AIO-Plugin-Sentinel/' . AIO_PS_VERSION . '; ' . home_url( '/' ) ) );
+			$response = wp_remote_get( $url, array( 'timeout' => 15, 'redirection' => 3, 'user-agent' => 'AIO-Malicious-Extension-Guard/' . AIOMEG_VERSION . '; ' . home_url( '/' ) ) );
 			if ( is_wp_error( $response ) ) {
 				$checks[] = array( 'url' => $url, 'status' => 0, 'error' => $response->get_error_message(), 'suspicious' => false, 'markers' => array() );
 				continue;
@@ -266,7 +294,7 @@ class AIO_PS_Monitor {
 	}
 
 	private static function interval_seconds( $interval ) {
-		$intervals = array( 'aio_ps_15_minutes' => 15 * MINUTE_IN_SECONDS, 'hourly' => HOUR_IN_SECONDS, 'twicedaily' => 12 * HOUR_IN_SECONDS, 'daily' => DAY_IN_SECONDS );
+		$intervals = array( 'aiomeg_15_minutes' => 15 * MINUTE_IN_SECONDS, 'hourly' => HOUR_IN_SECONDS, 'twicedaily' => 12 * HOUR_IN_SECONDS, 'daily' => DAY_IN_SECONDS );
 		return isset( $intervals[ $interval ] ) ? $intervals[ $interval ] : HOUR_IN_SECONDS;
 	}
 }
