@@ -362,10 +362,10 @@ class AIOMEG_Plugin {
 	}
 
 	public function handle_cleanup() {
-		$this->require_admin_nonce( 'aiomeg_cleanup' );
-		if ( ! current_user_can( 'delete_plugins' ) || ! current_user_can( 'delete_users' ) ) {
+		if ( ! current_user_can( 'activate_plugins' ) || ! current_user_can( 'delete_plugins' ) || ! current_user_can( 'delete_users' ) ) {
 			wp_die( esc_html__( 'You are not allowed to run incident cleanup.', 'aio-malicious-extension-guard' ) );
 		}
+		check_admin_referer( 'aiomeg_cleanup' );
 		if ( empty( $_POST['aiomeg_acknowledge_cleanup'] ) ) {
 			$this->redirect( array( 'aiomeg_error' => rawurlencode( __( 'Confirm the cleanup acknowledgment before quarantining critical findings.', 'aio-malicious-extension-guard' ) ) ) );
 		}
