@@ -118,7 +118,8 @@ class AIOMEG_Plugin {
 	 * This works with custom content directories without depending on constants.
 	 */
 	public static function plugins_directory() {
-		return dirname( untrailingslashit( AIOMEG_DIR ) );
+		$directory = dirname( untrailingslashit( AIOMEG_DIR ) );
+		return untrailingslashit( (string) apply_filters( 'aiomeg_plugins_directory', $directory ) );
 	}
 
 	public function enqueue_admin_assets( $hook_suffix ) {

@@ -6,6 +6,7 @@ class Test_AIOMEG_Directory_Integrity extends WP_UnitTestCase {
 
 	public function set_up() {
 		parent::set_up();
+		add_filter( 'aiomeg_plugins_directory', array( $this, 'test_plugins_directory' ) );
 		$this->directory = WP_PLUGIN_DIR . '/aiomeg-test-fixture';
 		wp_mkdir_p( $this->directory . '/includes' );
 		file_put_contents( $this->directory . '/aiomeg-test-fixture.php', "<?php\n/*\nPlugin Name: AIO PS Test Fixture\nVersion: 1.0.0\n*/\n" );
@@ -13,7 +14,12 @@ class Test_AIOMEG_Directory_Integrity extends WP_UnitTestCase {
 		wp_clean_plugins_cache( true );
 	}
 
+	public function test_plugins_directory() {
+		return WP_PLUGIN_DIR;
+	}
+
 	public function tear_down() {
+		remove_filter( 'aiomeg_plugins_directory', array( $this, 'test_plugins_directory' ) );
 		@unlink( $this->directory . '/includes/helper.php' );
 		@rmdir( $this->directory . '/includes' );
 		@unlink( $this->directory . '/aiomeg-test-fixture.php' );
